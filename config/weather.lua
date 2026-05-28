@@ -11,21 +11,25 @@ return {
 
     useStaticWeather = true,
     staticWeather = {
-        ['BLIZZARD'] = 0.0, --0% chance
-        ['CLEAR'] = 0.1, -- 10% chance
-        ['CLEARING'] = 0.1, -- 10% chance
-        ['CLOUDS'] = 0.1, -- 10% chance
-        ['EXTRASUNNY'] = 0.4, -- 40% chance
-        ['FOGGY'] = 0.1,
-        ['NEUTRAL'] = 0.0,
-        ['OVERCAST'] = 0.1,
-        ['RAIN'] = 0.1,
-        ['SMOG'] = 0.1,
-        ['SNOW'] = 0.0,
-        ['SNOWLIGHT'] = 0.0,
-        ['THUNDER'] = 0.1,
-        ['XMAS'] = 0.0
+        ['BLIZZARD'] = 0.05,
+        ['CLEAR'] = 0.01,
+        ['CLEARING'] = 0.03,
+        ['CLOUDS'] = 0.12,
+        ['EXTRASUNNY'] = 0.02,
+        ['FOGGY'] = 0.18,
+        ['NEUTRAL'] = 0.08,
+        ['OVERCAST'] = 0.22,
+        ['RAIN'] = 0.12,
+        ['RAIN_HALLOWEEN'] = 0.12,
+        ['SMOG'] = 0.20,
+        ['SNOW'] = 0.01,
+        ['SNOWLIGHT'] = 0.01,
+        ['SNOW_HALLOWEEN'] = 0.07,
+        ['THUNDER'] = 0.10,
+        ['XMAS'] = 0.01
     },
+
+
 
     useWeatherSequences = true,
 
