@@ -1,6 +1,8 @@
 local buildWeatherList = require 'server.weatherbuilder'
+local weather_class = require 'classes.weather'
 
-local useScheduledWeather = lib.load('config.weather').useScheduledWeather
+local Config = lib.load('config.weather')
+local useScheduledWeather = Config.useScheduledWeather
 
 
 ---@type renewed_weather[]
@@ -20,19 +22,32 @@ local function executeCurrentWeather()
 end
 
 local function runWeatherList()
-    local currentWeather = executeCurrentWeather()
+    executeCurrentWeather()
 
     while not overrideWeather do
+        -- Always read the head of the list fresh each tick so outside mutations
+        -- (admin removals, exports.setWeather, etc.) are picked up immediately
+        -- and we never decrement a stale reference to a removed event.
+        local currentWeather = weatherList[1]
 
-        if weatherList[1] then
+        if currentWeather then
             currentWeather.time -= 1
 
             if currentWeather.time <= 0 then
                 table.remove(weatherList, 1)
-                currentWeather = executeCurrentWeather()
+
+                -- Rebuild the forecast if we just consumed the last event so
+                -- weather keeps cycling on long-lived servers instead of
+                -- freezing with an empty list.
+                if not weatherList[1] then
+                    weatherList = buildWeatherList()
+                end
+
+                executeCurrentWeather()
             end
         else
-            currentWeather = executeCurrentWeather()
+            weatherList = buildWeatherList()
+            executeCurrentWeather()
         end
         Wait(60000)
     end
@@ -42,8 +57,19 @@ CreateThread(runWeatherList)
 
 -- Admin related events --
 RegisterNetEvent('Renewed-Weather:server:removeWeatherEvent', function(index)
-    if IsPlayerAceAllowed(source, 'command.weather') and weatherList[index] then
-        table.remove(weatherList, index)
+    local source = source
+    if not IsPlayerAceAllowed(source, 'command.weather') or not weatherList[index] then return end
+
+    table.remove(weatherList, index)
+
+    -- If we removed the currently-active event, refill the list if it's now
+    -- empty and push the new head out to clients immediately so they don't
+    -- sit on the removed weather for up to a minute.
+    if index == 1 then
+        if not weatherList[1] then
+            weatherList = buildWeatherList()
+        end
+        executeCurrentWeather()
     end
 end)
 
@@ -65,9 +91,9 @@ lib.callback.register('Renewed-Weathersync:server:setWeatherType', function(sour
 end)
 
 lib.callback.register('Renewed-Weathersync:server:setEventTime', function(source, index, eventTime)
-    local weatherEvent = weatherList[index]
+    if IsPlayerAceAllowed(source, 'command.weather') and weatherList[index] then
+        local weatherEvent = weatherList[index]
 
-    if IsPlayerAceAllowed(source, 'command.weather') and weatherEvent then
         weatherEvent:SetEventTime(eventTime)
 
         return eventTime
@@ -97,6 +123,50 @@ lib.addCommand('blackout', {
         if not playerState then return end
         playerState.state:set('playerBlackOut', not playerState.state?.playerBlackOut, true)
 	end
+end)
+
+-- Exports for other resources --
+
+---Returns a copy of the currently active weather payload.
+---@return renewed_weather_payload?
+exports('getCurrentWeather', function()
+    return GlobalState.weather
+end)
+
+---Returns a serialized copy of the full upcoming forecast (index 1 is active).
+---Mutating the returned tables does not affect the live forecast.
+---@return renewed_weather_payload[]
+exports('getForecast', function()
+    local forecast = {}
+    for i = 1, #weatherList do
+        forecast[i] = weatherList[i]:GetWeatherData()
+    end
+    return forecast
+end)
+
+---Force a weather event to start now, pushing the existing forecast back.
+---Ignored while a scheduled-restart override is active.
+---@param weatherType string  e.g. 'RAIN', 'EXTRASUNNY'
+---@param duration? number    Minutes (defaults to Config.weatherCycletimer)
+---@param windSpeed? number
+---@param windDirection? number
+---@return boolean success
+exports('setWeather', function(weatherType, duration, windSpeed, windDirection)
+    if overrideWeather then return false end
+    if type(weatherType) ~= 'string' then return false end
+
+    ---@diagnostic disable-next-line: invisible
+    local event = weather_class:new({
+        weather = weatherType,
+        time = tonumber(duration) or Config.weatherCycletimer,
+        windSpeed = tonumber(windSpeed),
+        windDirection = tonumber(windDirection),
+    })
+
+    table.insert(weatherList, 1, event)
+    executeCurrentWeather()
+
+    return true
 end)
 
 -- Scheduled restart --
