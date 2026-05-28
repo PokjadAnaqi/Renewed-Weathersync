@@ -27,7 +27,9 @@ end
 ---Checks weather or not the current weather contains rain
 ---@return boolean
 function weather_class:IsRain()
-    return self.weather == 'RAIN' or self.weather == 'THUNDER'
+    return self.weather == 'RAIN'
+        or self.weather == 'THUNDER'
+        or self.weather == 'RAIN_HALLOWEEN'
 end
 
 ---Sets the weather time to the given value.
