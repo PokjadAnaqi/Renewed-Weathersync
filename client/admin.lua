@@ -1,74 +1,120 @@
 -- Weather Admin Management --
+
 local weatherTypes = {
     {
-        label = 'Blizzard',
+        label = 'BLIZZARD',
         value = 'BLIZZARD'
     },
     {
-        label = 'Clear',
+        label = 'CLEAR',
         value = 'CLEAR'
     },
     {
-        label = 'Clearing',
+        label = 'CLEARING',
         value = 'CLEARING'
     },
     {
-        label = 'Clouds',
+        label = 'CLOUDS',
         value = 'CLOUDS'
     },
     {
-        label = 'Extra Sunny',
+        label = 'EXTRA SUNNY',
         value = 'EXTRASUNNY'
     },
     {
-        label = 'Foggy',
+        label = 'FOGGY',
         value = 'FOGGY'
     },
     {
-        label = 'Neutral',
+        label = 'NEUTRAL',
         value = 'NEUTRAL'
     },
     {
-        label = 'Overcast',
+        label = 'OVERCAST',
         value = 'OVERCAST'
     },
     {
-        label = 'Rain',
+        label = 'RAIN',
         value = 'RAIN'
     },
     {
-        label = 'Smog',
+        label = 'RAIN HALLOWEEN',
+        value = 'RAIN_HALLOWEEN'
+    },
+    {
+        label = 'SMOG',
         value = 'SMOG'
     },
     {
-        label = 'Snow',
+        label = 'SNOW',
         value = 'SNOW'
     },
     {
-        label = 'Snowlight',
+        label = 'SNOW LIGHT',
         value = 'SNOWLIGHT'
     },
     {
-        label = 'Thunder',
+        label = 'SNOW HALLOWEEN',
+        value = 'SNOW_HALLOWEEN'
+    },
+    {
+        label = 'THUNDER',
         value = 'THUNDER'
     },
     {
-        label = 'Xmas',
+        label = 'XMAS',
         value = 'XMAS'
     },
 }
 
-local function viewWeatherEvent(index, weatherEvent, isQueued)
+local currentWeatherTable = {}
+
+local viewWeatherEvent
+
+local function GetWeatherLabel(weather)
+
+    for i = 1, #weatherTypes do
+
+        local data = weatherTypes[i]
+
+        if data.value == weather then
+            return data.label
+        end
+    end
+
+    return weather
+end
+
+local function RefreshWeatherMenu()
+
+    lib.hideContext(false)
+
+    SetTimeout(150, function()
+
+        TriggerEvent('Renewed-Weather:client:viewWeatherInfo', currentWeatherTable)
+
+    end)
+end
+
+viewWeatherEvent = function(index, weatherEvent, isQueued)
+
+    local weatherLabel = GetWeatherLabel(weatherEvent.weather)
+
     local metadata = isQueued and {
-        ('Weather %s'):format(weatherEvent.weather),
+        ('Weather %s'):format(weatherLabel),
+
         ('Lasting for %s minutes'):format(weatherEvent.time)
+
     } or {
-        ('Weather %s'):format(weatherEvent.weather),
+
+        ('Weather %s'):format(weatherLabel),
+
         ('%s Minutes Remaining'):format(weatherEvent.time)
     }
+
     lib.registerContext({
         id = 'Renewed-Weathersync:client:changeWeather',
-        title = 'Change Weather',
+        title = ('Change Weather (%s)'):format(weatherLabel),
         menu = 'Renewed-Weathersync:client:manageWeather',
         options = {
             {
@@ -82,25 +128,27 @@ local function viewWeatherEvent(index, weatherEvent, isQueued)
                 icon = 'fa-solid fa-cloud',
                 arrow = true,
                 onSelect = function()
-                    local input = lib.inputDialog('Change Weather Type', {
-                        {
-                            label = 'Select Weather',
-                            type = 'select',
-                            required = true,
-                            default = weatherEvent.weather,
-                            options = weatherTypes
-                        },
-                    })
-
+                    local input =
+                        lib.inputDialog(
+                            'Change Weather Type',
+                            {
+                                {
+                                    label = 'Select Weather',
+                                    type = 'select',
+                                    required = true,
+                                    default = weatherEvent.weather,
+                                    options = weatherTypes
+                                },
+                            }
+                        )
                     if input and input[1] then
-                        local weather = lib.callback.await('Renewed-Weathersync:server:setWeatherType', false, index, input[1])
-
+                        local weather =
+                            lib.callback.await('Renewed-Weathersync:server:setWeatherType', false, index, input[1])
                         if weather then
                             weatherEvent.weather = weather
                         end
                     end
-
-                    viewWeatherEvent(index, weatherEvent)
+                    RefreshWeatherMenu()
                 end
             },
             {
@@ -108,26 +156,28 @@ local function viewWeatherEvent(index, weatherEvent, isQueued)
                 arrow = true,
                 icon = 'fa-solid fa-hourglass-half',
                 onSelect = function()
-                    local input = lib.inputDialog('Change Duration', {
-                        {
-                            label = 'Duration in minutes',
-                            type = 'slider',
-                            required = true,
-                            min = 1,
-                            max = 120,
-                            default = weatherEvent.time,
-                        },
-                    })
-
+                    local input =
+                        lib.inputDialog(
+                            'Change Duration',
+                            {
+                                {
+                                    label = 'Duration in minutes',
+                                    type = 'slider',
+                                    required = true,
+                                    min = 1,
+                                    max = 120,
+                                    default = weatherEvent.time,
+                                },
+                            }
+                        )
                     if input and input[1] then
-                        local time = lib.callback.await('Renewed-Weathersync:server:setEventTime', false, index, input[1])
-
+                        local time =
+                            lib.callback.await('Renewed-Weathersync:server:setEventTime', false, index, input[1])
                         if time then
                             weatherEvent.time = time
                         end
                     end
-
-                    viewWeatherEvent(index, weatherEvent)
+                    RefreshWeatherMenu()
                 end
             },
             {
@@ -136,53 +186,65 @@ local function viewWeatherEvent(index, weatherEvent, isQueued)
                 icon = 'fa-solid fa-circle-xmark',
                 onSelect = function()
                     TriggerServerEvent('Renewed-Weather:server:removeWeatherEvent', index)
+                    table.remove(currentWeatherTable, index)
+                    RefreshWeatherMenu()
                 end
             }
         }
     })
-
     lib.showContext('Renewed-Weathersync:client:changeWeather')
 end
 
-RegisterNetEvent('Renewed-Weather:client:viewWeatherInfo', function(weatherTable)
-    local options = {}
-    local amt = 0
+RegisterNetEvent('Renewed-Weather:client:viewWeatherInfo',function(weatherTable)
 
-    local startingIn = 0
+        currentWeatherTable = weatherTable
 
-    for i = 1, #weatherTable do
-        local currentWeather = weatherTable[i]
-        amt += 1
+        local options = {}
+        local amt = 0
+        local startingIn = 0
 
-        local isQueued = i > 1
+        for i = 1, #weatherTable do
 
-        local meatadata = isQueued and {
-            ('Starting in %s minutes'):format(startingIn),
-            ('Lasting for %s minutes'):format(currentWeather.time)
-        } or {
-            ('%s Minutes Remaining'):format(currentWeather.time)
-        }
+            local currentWeather = weatherTable[i]
+            amt += 1
+            local isQueued = i > 1
+            local weatherLabel = GetWeatherLabel(currentWeather.weather)
+            local metadata = isQueued and {
 
-        options[amt] = {
-            title = isQueued and ('Upcomming Weather: %s'):format(currentWeather.weather) or ('Current Weather: %s'):format(currentWeather.weather),
-            description = isQueued and ('Starting in %s minutes'):format(startingIn),
-            arrow = true,
-            icon = isQueued and 'fa-solid fa-cloud-arrow-up' or 'fa-solid fa-cloud',
-            metadata = meatadata,
-            onSelect = function()
-                viewWeatherEvent(i, currentWeather, isQueued)
-            end
-        }
+                ('Starting in %s minutes'):format(startingIn),
 
-        startingIn += currentWeather.time
+                ('Lasting for %s minutes'):format(currentWeather.time)
+
+            } or {
+
+                ('%s Minutes Remaining'):format(currentWeather.time)
+            }
+
+            options[amt] = {
+
+                title = isQueued
+                    and ('Upcoming Weather: %s'):format(weatherLabel)
+
+                    or ('Current Weather: %s'):format(weatherLabel),
+
+                description = isQueued and ('Starting in %s minutes'):format(startingIn),
+
+                arrow = true,
+                icon = isQueued and 'fa-solid fa-cloud-arrow-up' or 'fa-solid fa-cloud',
+                metadata = metadata,
+                onSelect = function()
+                    viewWeatherEvent( i, currentWeather, isQueued)
+                end
+            }
+            startingIn += currentWeather.time
+        end
+        lib.registerContext({
+            id = 'Renewed-Weathersync:client:manageWeather',
+            title = 'Weather Management',
+            options = options
+        })
+        lib.showContext(
+            'Renewed-Weathersync:client:manageWeather'
+        )
     end
-
-
-    lib.registerContext({
-        id = 'Renewed-Weathersync:client:manageWeather',
-        title = 'Weather Management',
-        options = options
-    })
-
-    lib.showContext('Renewed-Weathersync:client:manageWeather')
-end)
+)
