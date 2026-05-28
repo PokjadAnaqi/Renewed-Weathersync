@@ -4,6 +4,8 @@ local Config = lib.load('config.weather')
 
 local weather_class = require 'classes.weather'
 
+-- Recomputed every time the forecast is rebuilt so month-gated sequences
+-- (e.g. December snow) stay accurate across midnight on the 1st.
 local currentMonth = tonumber(os.date('%m'))
 
 local cycleTimer = Config.weatherCycletimer
@@ -11,6 +13,7 @@ local cycleTimer = Config.weatherCycletimer
 local rainFilter = {
     ['RAIN'] = true,
     ['THUNDER'] = true,
+    ['RAIN_HALLOWEEN'] = true,
 }
 
 local math_random = math.random
@@ -115,6 +118,8 @@ end
 
 return function()
     local weatherList = {}
+
+    currentMonth = tonumber(os.date('%m'))
 
     if Config.decemberSnow and currentMonth == 12 then
         return getDecemberSnow()
